@@ -83,30 +83,57 @@ int main(int argc, char **argv){
 	if (dist < dist_hp){
  	    ackerData_.drive.speed = 0;
 		ackerData_.drive.steering_angle = 0;
+		ackerData_.drive.brake = 200;
+	}
+	else if(dist < 1.5 && dist > dist_hp){
+		ackerData_.drive.speed = 1;
+		ackerData_.drive.steering_angle = pre_angle;
+
 	}
 	else{
+		cout << "yaw: " << yaw_d << endl;
 		if (yaw_d >= 0 && yaw_d < 90){	
 			local_x = dx*cos(yaw) + dy*sin(yaw);
 			local_y = -dx*sin(yaw) + dy*cos(yaw);
 			steer = atan(local_y/local_x);
+			if (local_x>0) steer = steer; 
+			else 
+				if (local_y>0) steer = M_PI - abs(steer);
+				else steer = -(M_PI - abs(steer));
 			cout << "state1" << endl;
 		}
 		else if (yaw_d >= 90 && yaw_d < 180){
 			local_x = -dx*cos(M_PI-yaw) + dy*sin(M_PI-yaw);
 			local_y = -dx*sin(M_PI-yaw) - dy*cos(M_PI-yaw);
 			steer = atan(local_y/local_x);
+			if (local_x>0) steer = steer; 
+			else 
+				if (local_y>0) steer = M_PI - abs(steer);
+				else steer = -(M_PI - abs(steer));
 			cout << "state2" << endl;
 		}
 		else if (yaw_d >= -90 && yaw_d < 0){
 			local_x = dx*cos(abs(yaw)) - dy*sin(abs(yaw));
 			local_y = dx*sin(abs(yaw)) + dy*cos(abs(yaw));
 			steer = atan(local_y/local_x);
+			if (local_x>0) steer = steer; 
+			else 
+				if (local_y>0) steer = M_PI - abs(steer);
+				else steer = -(M_PI - abs(steer));
 			cout << "state3" << endl;
 		}
 		else if (yaw_d >= -180 && yaw_d < -90){
 			local_x = -dx*cos(M_PI-abs(yaw)) - dy*sin(M_PI-abs(yaw));
 			local_y = dx*sin(M_PI-abs(yaw)) - dy*cos(M_PI-abs(yaw));
 			steer = atan(local_y/local_x);
+			if (local_x>0) steer = steer; 
+			else 
+				if (local_y>0) steer = M_PI - abs(steer);
+				else steer = -(M_PI - abs(steer));
+			/*if (dy<0 && dx<0){
+				steer = -(M_PI-steer);
+				cout << "####" << endl;}
+			else if (dy>0 && dx<0) steer = M_PI-abs(steer);*/
 			cout << "state4" << endl;
 		}
 		
@@ -118,7 +145,8 @@ int main(int argc, char **argv){
 		double cur_steer = (true_angle-yaw)* 180/M_PI;
         
 		ackerData_.drive.steering_angle = cur_steer;*/
-		ackerData_.drive.steering_angle = steer*180/M_PI;
+		ackerData_.drive.steering_angle = -steer*180/M_PI;
+		pre_angle = ackerData_.drive.steering_angle;
 		cout << ackerData_.drive.steering_angle << endl;
 		ackerData_.drive.speed = 2;
 		}
