@@ -12,7 +12,7 @@
 #define _USE_MATH_DEFINES
 using namespace std;
 double ggx, ggy, ggz;
-double lx, ly, lz, yaw_d;
+double lx, ly, lz, yaw_d, yaw;
 double pre_angle;
 
 void odomCallback(const nav_msgs::Odometry::ConstPtr &odomsg){
@@ -25,10 +25,11 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr &odomsg){
 		odomsg->pose.pose.orientation.z,
 		odomsg->pose.pose.orientation.w);
 	tf::Matrix3x3 m(q);
-	double roll, pitch, yaw;
+	double roll, pitch;
 	m.getRPY(roll, pitch, yaw);
 
 	yaw_d = yaw*180/M_PI;
+	//cout << yaw_d << endl;
 }
 
 int main(int argc, char **argv){
@@ -38,7 +39,6 @@ int main(int argc, char **argv){
 	ros::Publisher pub = nh.advertise<ackermann_msgs::AckermannDriveStamped>("/ctrl_cmd",10);
    	ros::Subscriber sub_o = nh.subscribe("/odom", 1 , odomCallback);
 	ros::Publisher marker_pub = nh.advertise<visualization_msgs::Marker>("visualization_marker", 10);
- 	double cur_steer;
 
     nh.setParam("global_goal_x", ggx);
     nh.setParam("global_goal_y", ggy);
@@ -68,36 +68,64 @@ int main(int argc, char **argv){
 	p.z = 0;
 	points.points.push_back(p);
 	
-	double dx = ggx-lx;
-        double dy = ggy-ly;
-
+	double dx = (ggx-lx);
+    double dy = (ggy-ly);
+	double local_x, local_y;
 	double dist = sqrt(dx*dx + dy*dy);
-	double dist_hp = 0.5; //50cm
+	double dist_hp = 1; //50cm
 
-	double ab_degree = atan2(ggy-ly, ggx-lx)*180/M_PI;
+	double ab_degree = abs(atan2(ggy-ly, ggx-lx));
 	double true_angle;
+	double degree = atan2(dy, dx);
+
+	double steer;
 	pre_angle = ackerData_.drive.steering_angle;
 	if (dist < dist_hp){
- 	    	ackerData_.drive.speed = 0;
+ 	    ackerData_.drive.speed = 0;
 		ackerData_.drive.steering_angle = 0;
 	}
 	else{
-		if (dx>=0 && dy>=0) true_angle = 90.0-ab_degree;
-		else if (dx>=0 && dy<=0) true_angle = 90.0-ab_degree;
-		else if (dx<=0 && dy>=0) true_angle = 270.0-ab_degree;
-		else if (dx>=0 && dy<=0) true_angle = 270.0-ab_degree;
+		if (yaw_d >= 0 && yaw_d < 90){	
+			local_x = dx*cos(yaw) + dy*sin(yaw);
+			local_y = -dx*sin(yaw) + dy*cos(yaw);
+			steer = atan(local_y/local_x);
+			cout << "state1" << endl;
+		}
+		else if (yaw_d >= 90 && yaw_d < 180){
+			local_x = -dx*cos(M_PI-yaw) + dy*sin(M_PI-yaw);
+			local_y = -dx*sin(M_PI-yaw) - dy*cos(M_PI-yaw);
+			steer = atan(local_y/local_x);
+			cout << "state2" << endl;
+		}
+		else if (yaw_d >= -90 && yaw_d < 0){
+			local_x = dx*cos(abs(yaw)) - dy*sin(abs(yaw));
+			local_y = dx*sin(abs(yaw)) + dy*cos(abs(yaw));
+			steer = atan(local_y/local_x);
+			cout << "state3" << endl;
+		}
+		else if (yaw_d >= -180 && yaw_d < -90){
+			local_x = -dx*cos(M_PI-abs(yaw)) - dy*sin(M_PI-abs(yaw));
+			local_y = dx*sin(M_PI-abs(yaw)) - dy*cos(M_PI-abs(yaw));
+			steer = atan(local_y/local_x);
+			cout << "state4" << endl;
+		}
 		
-		cur_steer = true_angle - pre_angle;
-		if(cur_steer<-180) cur_steer = 360 - pre_angle + true_angle;
-		else if(cur_steer>180) cur_steer = true_angle - pre_angle - 360;
-
-		ackerData_.drive.steering_angle = cur_steer;
-		//ackerData_.drive.steering_angle = 25;			
+		/*if(dx>=0 && dy>0) true_angle = M_PI/2 - degree;
+		else if(dx>=0 && dy<0) true_angle = M_PI/2 - degree;
+		else if(dx<0 && dy<0) true_angle = 3/2*M_PI - degree;
+		else if(dx<0 && dy>0) true_angle = 3/2*M_PI - degree;
+		
+		double cur_steer = (true_angle-yaw)* 180/M_PI;
+        
+		ackerData_.drive.steering_angle = cur_steer;*/
+		ackerData_.drive.steering_angle = steer*180/M_PI;
+		cout << ackerData_.drive.steering_angle << endl;
 		ackerData_.drive.speed = 2;
 		}
 	//cout << ackerData_ << endl;
 	//cout << M_PI;
-	cout << "steering angle: " << ackerData_.drive.steering_angle << endl;
+	//cout << "steering angle: " << ackerData_.drive.steering_angle << endl;
+	//cout << ackerData_ << endl;
 	pub.publish(ackerData_);
 	marker_pub.publish(points);
 	ros::spinOnce();
